@@ -326,6 +326,10 @@ def add_preprocess_args(parser):
                        help="Generate joined dictionary")
     group.add_argument("--only-source", action="store_true",
                        help="Only process the source language")
+    group.add_argument("--no-src-eos", action="store_true",
+                       help="Do not append eos token to source language")
+    group.add_argument("--no-tgt-eos", action="store_true",
+                       help="Do not append eos token to target language")
     group.add_argument("--padding-factor", metavar="N", default=8, type=int,
                        help="Pad dictionary size to be multiple of N")
     group.add_argument("--workers", metavar="N", default=1, type=int,
