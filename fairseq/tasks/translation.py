@@ -38,7 +38,7 @@ def load_langpair_dataset(
     tgt, tgt_dict,
     combine, dataset_impl, upsample_primary,
     left_pad_source, left_pad_target, max_source_positions,
-    max_target_positions, prepend_bos=False, load_alignments=False,
+    max_target_positions, prepend_bos=False, load_alignments=False, append_eos_src=False,
     truncate_source=False, append_source_id=False, append_source_id_tgt_only=False,
     num_buckets=0,
     shuffle=True,
@@ -106,6 +106,10 @@ def load_langpair_dataset(
         src_dataset = PrependTokenDataset(src_dataset, src_dict.bos())
         if tgt_dataset is not None:
             tgt_dataset = PrependTokenDataset(tgt_dataset, tgt_dict.bos())
+
+    if append_eos_src:
+        assert hasattr(src_dict, "eos_index")
+        src_dataset = AppendTokenDataset(src_dataset, src_dict.eos())
 
     eos = None
     if append_source_id:
