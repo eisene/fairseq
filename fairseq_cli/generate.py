@@ -189,7 +189,8 @@ def _main(args, output_file):
                         extra_symbols_to_ignore=get_symbols_to_strip_from_output(generator),
                     )
 
-            src_str = decode_fn(src_str)
+            if not args.bpe_decode_tgt_only:
+                src_str = decode_fn(src_str)
             if has_target:
                 target_str = decode_fn(target_str)
 

@@ -601,6 +601,8 @@ def add_generation_args(parser):
                        help='perform unknown replacement (optionally with alignment dictionary)')
     group.add_argument('--sacrebleu', action='store_true',
                        help='score with sacrebleu')
+    group.add_argument('--bpe-decode-tgt-only', action='store_true',
+                       help='bpe decode only the target')
     group.add_argument('--score-reference', action='store_true',
                        help='just score the reference translation')
     group.add_argument('--prefix-size', default=0, type=int, metavar='PS',
