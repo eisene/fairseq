@@ -171,6 +171,7 @@ class SequenceGenerator(nn.Module):
         prefix_tokens: Optional[Tensor] = None,
         constraints: Optional[Tensor] = None,
         bos_token: Optional[int] = None,
+        return_incremental_states: Optional[bool] = False,
     ):
         incremental_states = torch.jit.annotate(
             List[Dict[str, Dict[str, Optional[Tensor]]]],
@@ -379,6 +380,7 @@ class SequenceGenerator(nn.Module):
                     attn,
                     src_lengths,
                     max_len,
+                    incremental_states if return_incremental_states else None
                 )
                 num_remaining_sent -= len(finalized_sents)
 
@@ -550,6 +552,7 @@ class SequenceGenerator(nn.Module):
         attn: Optional[Tensor],
         src_lengths,
         max_len: int,
+        incremental_states
     ):
         """Finalize hypothesis, store finalized information in `finalized`, and change `finished` accordingly.
         A sentence is finalized when {beam_size} finished items have been collected for it.
@@ -632,15 +635,25 @@ class SequenceGenerator(nn.Module):
                 else:
                     hypo_attn = torch.empty(0)
 
-                finalized[sent].append(
-                    {
-                        "tokens": tokens_clone[i],
-                        "score": score,
-                        "attention": hypo_attn,  # src_len x tgt_len
-                        "alignment": torch.empty(0),
-                        "positional_scores": pos_scores[i],
-                    }
-                )
+                to_append = {
+                    "tokens": tokens_clone[i],
+                    "score": score,
+                    "attention": hypo_attn,  # src_len x tgt_len
+                    "alignment": torch.empty(0),
+                    "positional_scores": pos_scores[i],
+                }
+                if incremental_states is not None:
+                    # Deep copy incremental state
+                    cur_incremental_state = {}
+                    for k1, v1 in incremental_states[sent].items():
+                        cur_incremental_state[k1] = {}
+                        for k2, v2 in v1.items():
+                            if v2 is None:
+                                cur_incremental_state[k1][k2] = None
+                            else:
+                                cur_incremental_state[k1][k2] = v2.clone()
+                    to_append['incremental_states'] = cur_incremental_state
+                finalized[sent].append(to_append)
 
         newly_finished: List[int] = []
 
