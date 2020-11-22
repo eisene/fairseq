@@ -146,7 +146,11 @@ class GeneratorHubInterface(nn.Module):
     ) -> List[List[Dict[str, torch.Tensor]]]:
         if torch.is_tensor(tokenized_sentences) and tokenized_sentences.dim() == 1:
             return self.generate(
-                tokenized_sentences.unsqueeze(0), beam=beam, verbose=verbose, **kwargs
+                tokenized_sentences.unsqueeze(0),
+                beam=beam,
+                verbose=verbose,
+                inference_step_args=inference_step_args,
+                **kwargs
             )[0]
 
         # build generator using current args as well as any kwargs

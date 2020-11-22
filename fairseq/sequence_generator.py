@@ -171,15 +171,25 @@ class SequenceGenerator(nn.Module):
         prefix_tokens: Optional[Tensor] = None,
         constraints: Optional[Tensor] = None,
         bos_token: Optional[int] = None,
+        incremental_states: Optional[Dict[str, Dict[str, Tensor]]] = None,
         return_incremental_states: Optional[bool] = False,
     ):
-        incremental_states = torch.jit.annotate(
-            List[Dict[str, Dict[str, Optional[Tensor]]]],
-            [
-                torch.jit.annotate(Dict[str, Dict[str, Optional[Tensor]]], {})
-                for i in range(self.model.models_size)
-            ],
-        )
+        if incremental_states is None:
+            incremental_states = torch.jit.annotate(
+                List[Dict[str, Dict[str, Optional[Tensor]]]],
+                [
+                    torch.jit.annotate(Dict[str, Dict[str, Optional[Tensor]]], {})
+                    for i in range(self.model.models_size)
+                ],
+            )
+        else:
+            incremental_states = torch.jit.annotate(
+                List[Dict[str, Dict[str, Optional[Tensor]]]],
+                [
+                    torch.jit.annotate(Dict[str, Dict[str, Optional[Tensor]]], incremental_states[i])
+                    for i in range(self.model.models_size)
+                ],
+            )
         net_input = sample["net_input"]
 
         if 'src_tokens' in net_input:
@@ -643,16 +653,18 @@ class SequenceGenerator(nn.Module):
                     "positional_scores": pos_scores[i],
                 }
                 if incremental_states is not None:
-                    # Deep copy incremental state
-                    cur_incremental_state = {}
-                    for k1, v1 in incremental_states[sent].items():
-                        cur_incremental_state[k1] = {}
-                        for k2, v2 in v1.items():
-                            if v2 is None:
-                                cur_incremental_state[k1][k2] = None
-                            else:
-                                cur_incremental_state[k1][k2] = v2.clone()
-                    to_append['incremental_states'] = cur_incremental_state
+                    # Deep copy incremental states for the model ensemble
+                    to_append['incremental_states'] = []
+                    for incremental_state in incremental_states:
+                        cur_incremental_state = {}
+                        for k1, v1 in incremental_states[sent].items():
+                            cur_incremental_state[k1] = {}
+                            for k2, v2 in v1.items():
+                                if v2 is None:
+                                    cur_incremental_state[k1][k2] = None
+                                else:
+                                    cur_incremental_state[k1][k2] = v2.clone()
+                        to_append['incremental_states'].append(cur_incremental_state)
                 finalized[sent].append(to_append)
 
         newly_finished: List[int] = []
