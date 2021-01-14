@@ -432,7 +432,9 @@ def deprecation_warning(message, stacklevel=3):
 
 def get_activation_fn(activation: str) -> Callable:
     """ Returns the activation function corresponding to `activation` """
-    if activation == "relu":
+    if activation == "swish":
+        return F.silu
+    elif activation == "relu":
         return F.relu
     elif activation == "gelu":
         return gelu
@@ -453,6 +455,7 @@ def get_activation_fn(activation: str) -> Callable:
 
 def get_available_activation_fns() -> List:
     return [
+        "swish",
         "relu",
         "gelu",
         "gelu_fast",  # deprecated
