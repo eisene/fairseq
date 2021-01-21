@@ -30,6 +30,7 @@ class SequenceGenerator(nn.Module):
         temperature=1.0,
         match_source_len=False,
         no_repeat_ngram_size=0,
+        repetition_penalty=1,
         search_strategy=None,
         eos=None,
         symbols_to_strip_from_output=None,
@@ -82,6 +83,7 @@ class SequenceGenerator(nn.Module):
         self.temperature = temperature
         self.match_source_len = match_source_len
         self.no_repeat_ngram_size = no_repeat_ngram_size
+        self.repetition_penalty = repetition_penalty
         assert temperature > 0, "--temperature must be greater than 0"
 
         self.search = (
@@ -347,6 +349,9 @@ class SequenceGenerator(nn.Module):
 
             if self.no_repeat_ngram_size > 0:
                 lprobs = self._no_repeat_ngram(tokens, lprobs, bsz, beam_size, step)
+
+            if not self.repetition_penalty == 1:
+                lprobs = self._repetition_penalty(tokens, lprobs, bsz, beam_size, step)
 
             # Shape: (batch, cand_size)
             cand_scores, cand_indices, cand_beams = self.search.step(
@@ -754,6 +759,19 @@ class SequenceGenerator(nn.Module):
             lprobs[bbsz_idx][
                 torch.tensor(banned_tokens[bbsz_idx]).long()
             ] = torch.tensor(-math.inf).to(lprobs)
+        return lprobs
+
+    def _repetition_penalty(self, tokens, lprobs, bsz: int, beam_size: int, step: int):
+        # See here:
+        #   https://github.com/huggingface/transformers/blob/eabad8fd9c8e24e359a022e55e2a46bdd8f50b6f/src/transformers/generation_logits_process.py#L141
+        tokens = tokens[:, :step+1]
+        ranges = torch.arange(lprobs.shape[0])
+        score = lprobs[ranges[:, None], tokens]
+
+        # if score < 0 then repetition penalty has to be multiplied to reduce the previous token probability
+        score = torch.where(score < 0, score * self.repetition_penalty, score / self.repetition_penalty)
+
+        lprobs[ranges[:, None], tokens] = score
         return lprobs
 
 
