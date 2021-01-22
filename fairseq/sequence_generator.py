@@ -32,6 +32,7 @@ class SequenceGenerator(nn.Module):
         no_repeat_ngram_size=0,
         repetition_penalty=1,
         repetition_penalty_slope=0,
+        repetition_penalty_window_length=None,
         search_strategy=None,
         eos=None,
         symbols_to_strip_from_output=None,
@@ -86,6 +87,7 @@ class SequenceGenerator(nn.Module):
         self.no_repeat_ngram_size = no_repeat_ngram_size
         self.repetition_penalty = repetition_penalty
         self.repetition_penalty_slope = repetition_penalty_slope
+        self.repetition_penalty_window_length = repetition_penalty_window_length
         assert temperature > 0, "--temperature must be greater than 0"
 
         self.search = (
@@ -767,6 +769,8 @@ class SequenceGenerator(nn.Module):
         # See here:
         #   https://github.com/huggingface/transformers/blob/eabad8fd9c8e24e359a022e55e2a46bdd8f50b6f/src/transformers/generation_logits_process.py#L141
         tokens = tokens[:, :step+1]
+        if self.repetition_penalty_window_length is not None:
+            tokens = tokens[:, -self.repetition_penalty_window_length:]
         ranges = torch.arange(lprobs.shape[0])
         score = lprobs[ranges[:, None], tokens]
         vic_s = [torch.unique(row, return_inverse=True, return_counts=True) for row in tokens]
