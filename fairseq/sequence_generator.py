@@ -58,6 +58,14 @@ class SequenceGenerator(nn.Module):
                 sharper samples (default: 1.0)
             match_source_len (bool, optional): outputs should match the source
                 length (default: False)
+            no_repeat_ngram_size (int, optional): forbid repetition of n-grams
+                this long (default: 0)
+            repetition_penalty (float, optional): CTRL-style repetition penalty
+                term (default: 1=no penalty)
+            repetition_penalty_slope (float, optional): slope for the power to
+                raise the repetition penalty to, (penalty)^(1+slope*(count-1))
+            repetition_penalty_window_length (int, optional): only look back
+                this long to calculate the repetition penalty
         """
         super().__init__()
         if isinstance(models, EnsembleModel):
