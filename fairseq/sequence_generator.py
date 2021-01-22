@@ -33,6 +33,7 @@ class SequenceGenerator(nn.Module):
         repetition_penalty=1,
         repetition_penalty_slope=0,
         repetition_penalty_window_length=None,
+        ngram_repetition_penalty=None,
         search_strategy=None,
         eos=None,
         symbols_to_strip_from_output=None,
@@ -60,6 +61,8 @@ class SequenceGenerator(nn.Module):
                 length (default: False)
             no_repeat_ngram_size (int, optional): forbid repetition of n-grams
                 this long (default: 0)
+            ngram_repetition_penalty (int, optional): penalty for repeating an
+                n-gram, combine with no_repeat_ngram_size
             repetition_penalty (float, optional): CTRL-style repetition penalty
                 term (default: 1=no penalty)
             repetition_penalty_slope (float, optional): slope for the power to
@@ -96,6 +99,7 @@ class SequenceGenerator(nn.Module):
         self.repetition_penalty = repetition_penalty
         self.repetition_penalty_slope = repetition_penalty_slope
         self.repetition_penalty_window_length = repetition_penalty_window_length
+        self.ngram_repetition_penalty = ngram_repetition_penalty
         assert temperature > 0, "--temperature must be greater than 0"
 
         self.search = (
@@ -768,9 +772,17 @@ class SequenceGenerator(nn.Module):
                 torch.jit.annotate(List[int], []) for bbsz_idx in range(bsz * beam_size)
             ]
         for bbsz_idx in range(bsz * beam_size):
-            lprobs[bbsz_idx][
-                torch.tensor(banned_tokens[bbsz_idx]).long()
-            ] = torch.tensor(-math.inf).to(lprobs)
+            if self.ngram_repetition_penalty is not None:
+                lprobs_row = lprobs[bbsz_idx][torch.tensor(banned_tokens[bbsz_idx]).long()]
+                lprobs[bbsz_idx][torch.tensor(banned_tokens[bbsz_idx]).long()] = torch.where(
+                    lprobs_row < 0,
+                    lprobs_row * self.ngram_repetition_penalty,
+                    lprobs_row / self.ngram_repetition_penalty,
+                )
+            else:
+                lprobs[bbsz_idx][
+                    torch.tensor(banned_tokens[bbsz_idx]).long()
+                ] = torch.tensor(-math.inf).to(lprobs)
         return lprobs
 
     def _repetition_penalty(self, tokens, lprobs, bsz: int, beam_size: int, step: int):
