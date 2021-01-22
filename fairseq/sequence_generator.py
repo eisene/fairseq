@@ -31,6 +31,7 @@ class SequenceGenerator(nn.Module):
         match_source_len=False,
         no_repeat_ngram_size=0,
         repetition_penalty=1,
+        repetition_penalty_slope=0,
         search_strategy=None,
         eos=None,
         symbols_to_strip_from_output=None,
@@ -84,6 +85,7 @@ class SequenceGenerator(nn.Module):
         self.match_source_len = match_source_len
         self.no_repeat_ngram_size = no_repeat_ngram_size
         self.repetition_penalty = repetition_penalty
+        self.repetition_penalty_slope = repetition_penalty_slope
         assert temperature > 0, "--temperature must be greater than 0"
 
         self.search = (
@@ -767,9 +769,17 @@ class SequenceGenerator(nn.Module):
         tokens = tokens[:, :step+1]
         ranges = torch.arange(lprobs.shape[0])
         score = lprobs[ranges[:, None], tokens]
+        vic_s = [torch.unique(row, return_inverse=True, return_counts=True) for row in tokens]
 
-        # if score < 0 then repetition penalty has to be multiplied to reduce the previous token probability
-        score = torch.where(score < 0, score * self.repetition_penalty, score / self.repetition_penalty)
+        for idx, ((score_row, token_row), (_, inverses, counts)) in enumerate(zip(zip(score, tokens), vic_s)):
+            penalties = torch.pow(
+                self.repetition_penalty,
+                1 + self.repetition_penalty_slope * (counts[inverses] - 1)).to(score)
+            # if score < 0 then repetition penalty has to be multiplied to reduce the previous token probability
+            score[idx] = torch.where(
+                score_row < 0,
+                score_row * penalties,
+                score_row / penalties)
 
         lprobs[ranges[:, None], tokens] = score
         return lprobs
